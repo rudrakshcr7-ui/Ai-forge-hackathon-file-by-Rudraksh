@@ -8,8 +8,7 @@ An AI-powered web application that evaluates a student's interview readiness acr
 
 ## 🎥 Demo Video
 
-> [📹 https://drive.google.com/file/d/1bMW9Ge8FpMvpNmTr9nAQlPznmsWP17QR/view?usp=drive_link
-
+> [📹 https://drive.google.com/drive/folders/1KiOKJhUn3whQ72NA_2vZhPp9sNZbCCjm?usp=drive_link
 ---
 
 ## 🚀 Live Demo
