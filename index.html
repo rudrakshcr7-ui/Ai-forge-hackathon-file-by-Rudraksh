@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CareerForge AI — Interview Readiness Evaluator</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#07070f;--surface:#0f0f1a;--card:#161625;--card2:#1c1c2e;
+  --border:#ffffff14;--border2:#ffffff22;
+  --cyan:#00d4ff;--cyan2:#00a8d4;--purple:#7c3aed;--purple2:#6d28d9;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;
+  --text:#f0f0ff;--text2:#a0a0c0;--text3:#606080;
+  --font:'Sora',sans-serif;--mono:'JetBrains Mono',monospace;
+  --r:12px;--r2:8px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* --- Noise texture overlay --- */
+body::before{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:0.4;}
+
+/* --- Glow blobs --- */
+.blob{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;}
+.blob1{width:500px;height:500px;background:#7c3aed18;top:-100px;left:-100px;}
+.blob2{width:400px;height:400px;background:#00d4ff12;bottom:-80px;right:-80px;}
+
+.screen{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1rem;animation:fadeUp 0.4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+/* --- Nav bar --- */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:#07070fcc;backdrop-filter:blur(12px);}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;letter-spacing:-0.3px;}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--purple),var(--cyan));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.nav-step{font-size:12px;color:var(--text2);font-family:var(--mono);}
+
+/* --- Step indicator --- */
+.steps-bar{display:flex;align-items:center;gap:0;margin-bottom:2rem;}
+.step-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);}
+.step-item.active{color:var(--cyan);}
+.step-item.done{color:var(--green);}
+.step-num{width:24px;height:24px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);font-weight:600;flex-shrink:0;}
+.step-item.done .step-num{background:var(--green);border-color:var(--green);color:#000;}
+.step-item.active .step-num{background:var(--cyan);border-color:var(--cyan);color:#000;}
+.step-line{width:32px;height:1.5px;background:var(--border2);margin:0 4px;}
+.step-line.done{background:var(--green);}
+
+/* --- Cards --- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:2rem;}
+.card-sm{background:var(--card2);border:1px solid var(--border);border-radius:var(--r2);padding:1.25rem 1.5rem;}
+
+/* --- Typography --- */
+h1{font-size:2.4rem;font-weight:700;letter-spacing:-1px;line-height:1.15;}
+h2{font-size:1.6rem;font-weight:600;letter-spacing:-0.5px;}
+h3{font-size:1.1rem;font-weight:600;}
+.gradient-text{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.muted{color:var(--text2);font-size:14px;line-height:1.7;}
+.tag{display:inline-block;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text2);background:var(--card2);}
+.tag.cyan{border-color:var(--cyan);color:var(--cyan);background:#00d4ff0a;}
+
+/* --- Forms --- */
+label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px;font-weight:500;}
+input[type=text],input[type=email],input[type=url],select,textarea{
+  width:100%;background:var(--card2);border:1px solid var(--border2);border-radius:var(--r2);
+  color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;
+  outline:none;transition:border-color 0.2s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan);}
+textarea{resize:vertical;min-height:120px;line-height:1.6;}
+select option{background:var(--card);}
+.form-row{margin-bottom:1.2rem;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+
+/* --- Tag selector --- */
+.tag-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.sel-tag{padding:6px 14px;border-radius:20px;border:1px solid var(--border2);font-size:13px;cursor:pointer;color:var(--text2);background:var(--card2);transition:all 0.2s;user-select:none;}
+.sel-tag:hover{border-color:var(--cyan);color:var(--cyan);}
+.sel-tag.on{background:#00d4ff15;border-color:var(--cyan);color:var(--cyan);}
+
+/* --- Rating buttons --- */
+.rating-group{display:flex;gap:8px;flex-wrap:wrap;}
+.rate-btn{flex:1;min-width:80px;padding:8px 10px;text-align:center;border:1px solid var(--border2);border-radius:var(--r2);font-size:12px;cursor:pointer;color:var(--text2);background:var(--card2);transition:all 0.2s;}
+.rate-btn:hover{border-color:var(--cyan);}
+.rate-btn.on{background:#00d4ff15;border-color:var(--cyan);color:var(--cyan);font-weight:600;}
+
+/* --- Buttons --- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 24px;border-radius:var(--r2);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:none;font-family:var(--font);}
+.btn-primary{background:linear-gradient(135deg,var(--cyan2),var(--purple));color:#fff;}
+.btn-primary:hover{opacity:0.9;transform:translateY(-1px);}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan);}
+.btn-lg{padding:14px 32px;font-size:15px;border-radius:10px;}
+.nav-row{display:flex;gap:10px;margin-top:1.5rem;}
+
+/* --- Welcome screen --- */
+.welcome-wrap{max-width:560px;width:100%;text-align:center;}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;border:1px solid var(--cyan);color:var(--cyan);font-size:12px;font-family:var(--mono);margin-bottom:1.5rem;}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(1.4);}}
+.feature-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2rem 0;text-align:left;}
+.feat{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:1rem;display:flex;align-items:flex-start;gap:10px;}
+.feat-icon{font-size:20px;flex-shrink:0;}
+.feat-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+.feat-desc{font-size:12px;color:var(--text3);}
+.api-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;margin-top:1.5rem;text-align:left;}
+
+/* --- Step screens --- */
+.step-wrap{max-width:640px;width:100%;padding-top:80px;}
+.section-head{margin-bottom:1.75rem;}
+
+/* --- MCQ --- */
+.mcq-opt{padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r2);font-size:13px;cursor:pointer;color:var(--text2);background:var(--card2);transition:all 0.2s;margin-bottom:8px;font-family:var(--mono);}
+.mcq-opt:hover{border-color:var(--cyan);}
+.mcq-opt.on{background:#00d4ff15;border-color:var(--cyan);color:var(--cyan);}
+.mcq-correct{background:#10b98115!important;border-color:var(--green)!important;color:var(--green)!important;}
+.mcq-wrong{background:#ef444415!important;border-color:var(--red)!important;color:var(--red)!important;}
+
+/* --- Loading --- */
+.loading-wrap{text-align:center;padding:4rem 2rem;}
+.spinner{width:60px;height:60px;border:3px solid var(--border2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.9s linear infinite;margin:0 auto 2rem;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.load-steps{display:flex;flex-direction:column;gap:12px;max-width:320px;margin:0 auto;}
+.load-step{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text3);}
+.load-step.done{color:var(--green);}
+.load-step.active{color:var(--cyan);}
+.load-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.load-step.active .load-dot{animation:pulse 1s infinite;}
+
+/* --- Results --- */
+.results-wrap{max-width:900px;width:100%;padding-top:80px;padding-bottom:4rem;}
+.score-hero{display:grid;grid-template-columns:200px 1fr;gap:2rem;align-items:center;margin-bottom:2rem;}
+.score-ring-wrap{position:relative;width:160px;height:160px;margin:0 auto;}
+.score-ring-wrap svg{transform:rotate(-90deg);}
+.score-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.score-num{font-size:42px;font-weight:700;font-family:var(--mono);}
+.score-denom{font-size:13px;color:var(--text3);}
+.grade-badge{display:inline-block;font-size:32px;font-weight:700;font-family:var(--mono);padding:8px 20px;border-radius:var(--r2);border:2px solid;}
+.grade-A{color:var(--green);border-color:var(--green);background:#10b98110;}
+.grade-B{color:var(--cyan);border-color:var(--cyan);background:#00d4ff10;}
+.grade-C{color:var(--amber);border-color:var(--amber);background:#f59e0b10;}
+.grade-D{color:#ff8c00;border-color:#ff8c00;background:#ff8c0010;}
+.grade-F{color:var(--red);border-color:var(--red);background:#ef444410;}
+
+.score-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem;}
+.score-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:1.25rem;text-align:center;}
+.sc-label{font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+.sc-val{font-size:24px;font-weight:700;font-family:var(--mono);}
+.sc-bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+.sc-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;transition:width 1.2s ease;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;}
+.feedback-list{display:flex;flex-direction:column;gap:10px;}
+.fb-item{display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--card2);border-radius:var(--r2);border:1px solid var(--border);}
+.fb-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.fb-text{font-size:13px;line-height:1.6;color:var(--text2);}
+
+.roadmap{display:flex;flex-direction:column;gap:0;}
+.roadmap-item{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);}
+.roadmap-item:last-child{border-bottom:none;}
+.rm-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--cyan2),var(--purple));color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.rm-title{font-size:14px;font-weight:600;margin-bottom:3px;}
+.rm-desc{font-size:12px;color:var(--text3);line-height:1.5;}
+
+.heatmap{display:flex;flex-wrap:wrap;gap:8px;}
+.hm-item{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;font-family:var(--mono);}
+.hm-high{background:#10b98120;color:var(--green);border:1px solid #10b98140;}
+.hm-mid{background:#f59e0b15;color:var(--amber);border:1px solid #f59e0b30;}
+.hm-low{background:#ef444415;color:var(--red);border:1px solid #ef444430;}
+
+@media(max-width:640px){
+  h1{font-size:1.8rem;}.form-grid{grid-template-columns:1fr;}
+  .score-hero{grid-template-columns:1fr;text-align:center;}
+  .score-cards{grid-template-columns:1fr 1fr;}
+  .two-col{grid-template-columns:1fr;}
+  .feature-row{grid-template-columns:1fr;}
+}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#1c1c2e;border:1px solid var(--red);color:var(--text);padding:12px 20px;border-radius:var(--r2);font-size:13px;z-index:999;animation:fadeUp 0.3s ease;max-width:90%;text-align:center;}
+@media print{
+  nav,.blob,.btn,body::before{display:none!important;}
+  body{background:#fff!important;color:#000!important;}
+  .screen{padding:0!important;}
+  .results-wrap{padding-top:1rem!important;}
+  .card,.card-sm,.score-card{background:#fff!important;border:1px solid #ddd!important;break-inside:avoid;}
+  .score-num,.gradient-text{color:#000!important;-webkit-text-fill-color:#000!important;}
+  .muted{color:#444!important;}
+  .hm-high{background:#d4edda!important;color:#155724!important;}
+  .hm-mid{background:#fff3cd!important;color:#856404!important;}
+  .hm-low{background:#f8d7da!important;color:#721c24!important;}
+}
+</style>
+</head>
+<body>
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<nav>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    CareerForge AI
+  </div>
+  <span class="nav-step" id="nav-step"></span>
+</nav>
+<div id="app"></div>
+
+<script>
+const SKILL_OPTS=['Python','Java','C/C++','JavaScript','React','Node.js','SQL','HTML/CSS','Machine Learning','Data Analysis','Git/GitHub','REST APIs','TypeScript','MongoDB','Docker','System Design','DSA','Problem Solving'];
+const ROLES=['Software Developer','Frontend Developer','Backend Developer','Full Stack Developer','Data Scientist','ML Engineer','Data Analyst','DevOps Engineer','Product Manager','Other'];
+const LEVELS=['Fresher (No experience)','0-1 year','1-3 years','3-5 years','5+ years'];
+
+const MCQ={
+  q:'What is the time complexity of binary search?',
+  opts:['O(n)','O(log n)','O(n log n)','O(1)'],
+  ans:1,
+  exp:'Binary search halves the search space each step → O(log n)'
+};
+
+let S=JSON.parse(localStorage.getItem('careerforge-state')||'null')||{
+  step:0, apiKey:'',
+  name:'', email:'', role:'', level:'',
+  resumeText:'', skills:[], mcqPick:null,
+  github:'', portfolio:'', linkedin:'', projectCount:'',
+  techComfort:'', behavComfort:'', commClarity:'', confidence:'',
+  result:null
+};
+
+const app=()=>document.getElementById('app');
+const navStep=()=>document.getElementById('nav-step');
+
+function setStep(n){
+  S.step=n;
+  saveState();
+  render();
+}
+
+function render(){
+  const screens=['welcome','profile','resume','skills','portfolio','communication','loading','results'];
+  const s=screens[S.step];
+  const steps=['Profile','Resume','Skills','Portfolio','Communication'];
+  if(S.step>=1&&S.step<=5) navStep().textContent=`Step ${S.step} of 5 — ${steps[S.step-1]}`;
+  else if(S.step===7) navStep().textContent='Your Results';
+  else navStep().textContent='';
+  const map={welcome:screenWelcome,profile:screenProfile,resume:screenResume,skills:screenSkills,portfolio:screenPortfolio,communication:screenComm,loading:screenLoading,results:screenResults};
+  try{
+  app().innerHTML = map[s]();
+}catch(err){
+  console.error(err);
+  app().innerHTML = `
+    <div class="screen">
+      <div class="card" style="max-width:500px;text-align:center">
+        <h2>Something went wrong</h2>
+        <p class="muted" style="margin-top:10px">
+          Please refresh the page and try again.
+        </p>
+      </div>
+    </div>
+  `;
+}
+  bindEvents();
+}
+
+function stepsBar(active){
+  const labels=['Profile','Resume','Skills','Portfolio','Comm'];
+  return `<div class="steps-bar">${labels.map((l,i)=>{
+    const idx=i+1;
+    const cls=idx<active?'done':idx===active?'active':'';
+    const line=i<4?`<div class="step-line ${i<active-1?'done':''}"></div>`:'';
+    return `<div class="step-item ${cls}"><div class="step-num">${idx<active?'✓':idx}</div><span style="font-size:11px">${l}</span></div>${line}`;
+  }).join('')}</div>`;
+}
+
+function screenWelcome(){
+  return `<div class="screen"><div class="welcome-wrap">
+    <div class="hero-badge"><div class="pulse"></div>AI-Powered Evaluation</div>
+    <h1>Know Your <span class="gradient-text">Interview Score</span> Before the Interview</h1>
+    <p class="muted" style="margin:1rem 0 0">Get an AI-generated Interview Readiness Score across 5 dimensions — in under 2 minutes.</p>
+    <div class="feature-row">
+      <div class="feat"><div class="feat-icon">📄</div><div><div class="feat-title">Resume Analysis</div><div class="feat-desc">ATS score, keyword gaps, formatting</div></div></div>
+      <div class="feat"><div class="feat-icon">⚡</div><div><div class="feat-title">Technical Skills</div><div class="feat-desc">Stack depth, coding aptitude</div></div></div>
+      <div class="feat"><div class="feat-icon">🗂️</div><div><div class="feat-title">Portfolio Eval</div><div class="feat-desc">GitHub, projects, web presence</div></div></div>
+      <div class="feat"><div class="feat-icon">🎙️</div><div><div class="feat-title">Communication</div><div class="feat-desc">Clarity, confidence, fluency</div></div></div>
+    </div>
+    <div class="api-box">
+      <label>Anthropic API Key <span style="color:var(--text3);font-size:11px">(used only in your browser, never stored)</span></label>
+      <input type="text" id="apikey" placeholder="sk-ant-..." value="${S.apiKey}" style="font-family:var(--mono);font-size:13px;margin-top:6px;"/>
+      <button class="btn btn-primary btn-lg" id="btn-start" style="width:100%;margin-top:1rem;" ${S.apiKey?'':'disabled'}>Start Evaluation →</button>
+      <p style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">Get a free key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--cyan)">console.anthropic.com</a></p>
+    </div>
+  </div></div>`;
+}
+
+function screenProfile(){
+  return `<div class="screen"><div class="step-wrap">
+    ${stepsBar(1)}
+    <div class="section-head"><h2>Your Profile</h2><p class="muted" style="margin-top:4px">Basic info to personalise your evaluation</p></div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-row"><label>Full Name</label><input type="text" id="f-name" value="${S.name}" placeholder="e.g. Rahul Sharma"/></div>
+        <div class="form-row"><label>Email</label><input type="email" id="f-email" value="${S.email}" placeholder="rahul@email.com"/></div>
+      </div>
+      <div class="form-row"><label>Target Role</label><select id="f-role">${ROLES.map(r=>`<option value="${r}" ${S.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Experience Level</label><select id="f-level">${LEVELS.map(l=>`<option value="${l}" ${S.level===l?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" onclick="setStep(0)">← Back</button>
+        <button class="btn btn-primary" id="btn-p2" style="flex:1" disabled>Continue →</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function screenResume(){
+  return `<div class="screen"><div class="step-wrap">
+    ${stepsBar(2)}
+    <div class="section-head"><h2>Resume Analysis</h2><p class="muted" style="margin-top:4px">Paste your resume text — our AI will evaluate ATS score, keyword relevance, and gaps</p></div>
+    <div class="card">
+      <div class="form-row">
+        <label>Paste your resume content <span style="color:var(--text3)">(or describe your experience)</span></label>
+        <textarea id="f-resume" placeholder="Paste your resume text here — education, experience, skills, projects, achievements...
+
+Example:
+Education: B.Tech Computer Science, VIT University 2024
+Skills: Python, Java, MySQL, React
+Projects: Built a weather app using Python and OpenWeatherMap API
+Experience: Internship at XYZ — developed REST APIs, reduced query time by 30%">${S.resumeText}</textarea>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" onclick="setStep(1)">← Back</button>
+        <button class="btn btn-primary" id="btn-p3" style="flex:1" disabled>Continue →</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function screenSkills(){
+  return `<div class="screen"><div class="step-wrap">
+    ${stepsBar(3)}
+    <div class="section-head"><h2>Technical Skills</h2><p class="muted" style="margin-top:4px">Select all technologies you're comfortable with + answer a quick coding question</p></div>
+    <div class="card" style="margin-bottom:1rem">
+      <label>Select your skills</label>
+      <div class="tag-grid" style="margin-top:8px">${SKILL_OPTS.map(s=>`<div class="sel-tag ${S.skills.includes(s)?'on':''}" data-skill="${s}">${s}</div>`).join('')}</div>
+    </div>
+    <div class="card">
+      <label style="margin-bottom:12px;font-size:14px;font-weight:600">Quick aptitude check</label>
+      <p style="font-size:14px;margin-bottom:14px;color:var(--text2)">${MCQ.q}</p>
+      ${MCQ.opts.map((o,i)=>`<div class="mcq-opt ${S.mcqPick===i?(i===MCQ.ans?'mcq-correct':'mcq-wrong'):''}" data-mcq="${i}">${String.fromCharCode(65+i)}. ${o}</div>`).join('')}
+      ${S.mcqPick!==null?`<div style="font-size:12px;margin-top:10px;padding:10px;background:var(--card2);border-radius:var(--r2);color:var(--text3)">💡 ${MCQ.exp}</div>`:''}
+      <div class="nav-row">
+        <button class="btn btn-ghost" onclick="setStep(2)">← Back</button>
+        <button class="btn btn-primary" id="btn-p4" style="flex:1" ${S.skills.length&&S.mcqPick!==null?'':'disabled'}>Continue →</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function screenPortfolio(){
+  return `<div class="screen"><div class="step-wrap">
+    ${stepsBar(4)}
+    <div class="section-head"><h2>Portfolio & Presence</h2><p class="muted" style="margin-top:4px">Help us evaluate your digital footprint and project portfolio</p></div>
+    <div class="card">
+      <div class="form-row"><label>GitHub Profile URL</label><input type="url" id="f-github" value="${S.github}" placeholder="https://github.com/username"/></div>
+      <div class="form-row"><label>Portfolio Website <span style="color:var(--text3)">(optional)</span></label><input type="url" id="f-portfolio" value="${S.portfolio}" placeholder="https://yoursite.com"/></div>
+      <div class="form-row"><label>LinkedIn URL <span style="color:var(--text3)">(optional)</span></label><input type="url" id="f-linkedin" value="${S.linkedin}" placeholder="https://linkedin.com/in/username"/></div>
+      <div class="form-row">
+        <label>Number of personal projects built</label>
+        <div class="rating-group">${['0','1–2','3–5','6–10','10+'].map(v=>`<div class="rate-btn ${S.projectCount===v?'on':''}" data-projcount="${v}">${v}</div>`).join('')}</div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" onclick="setStep(3)">← Back</button>
+        <button class="btn btn-primary" id="btn-p5" style="flex:1" ${S.projectCount?'':'disabled'}>Continue →</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function screenComm(){
+  const opts=['Not confident','Somewhat','Comfortable','Very confident'];
+  return `<div class="screen"><div class="step-wrap">
+    ${stepsBar(5)}
+    <div class="section-head"><h2>Communication & Confidence</h2><p class="muted" style="margin-top:4px">Honest self-assessment helps generate accurate recommendations</p></div>
+    <div class="card">
+      <div class="form-row">
+        <label>Confidence in technical interview questions</label>
+        <div class="rating-group">${opts.map(v=>`<div class="rate-btn ${S.techComfort===v?'on':''}" data-tc="${v}">${v}</div>`).join('')}</div>
+      </div>
+      <div class="form-row" style="margin-top:1rem">
+        <label>Confidence in HR / behavioural questions</label>
+        <div class="rating-group">${opts.map(v=>`<div class="rate-btn ${S.behavComfort===v?'on':''}" data-bc="${v}">${v}</div>`).join('')}</div>
+      </div>
+      <div class="form-row" style="margin-top:1rem">
+        <label>Spoken English / communication clarity</label>
+        <div class="rating-group">${['Basic','Moderate','Fluent','Excellent'].map(v=>`<div class="rate-btn ${S.commClarity===v?'on':''}" data-cc="${v}">${v}</div>`).join('')}</div>
+      </div>
+      <div class="form-row" style="margin-top:1rem">
+        <label>How do you handle interview pressure?</label>
+        <div class="rating-group">${['Freeze up','Get nervous but manage','Stay calm','Thrive under pressure'].map(v=>`<div class="rate-btn ${S.confidence===v?'on':''}" data-cn="${v}">${v}</div>`).join('')}</div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" onclick="setStep(4)">← Back</button>
+        <button class="btn btn-primary" id="btn-submit" style="flex:1" ${S.techComfort&&S.behavComfort&&S.commClarity&&S.confidence?'':'disabled'}>Get My Score ✨</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function screenLoading(){
+  return `<div class="screen"><div class="loading-wrap">
+    <div class="spinner"></div>
+    <h3 style="margin-bottom:0.5rem">Evaluating Your Profile</h3>
+    <p class="muted" style="margin-bottom:2rem">Our AI is analyzing your data across 5 dimensions...</p>
+    <div class="load-steps">
+      <div class="load-step done" id="ls1"><div class="load-dot"></div>Profile data collected</div>
+      <div class="load-step active" id="ls2"><div class="load-dot"></div>Analyzing resume quality</div>
+      <div class="load-step" id="ls3"><div class="load-dot"></div>Evaluating technical skills</div>
+      <div class="load-step" id="ls4"><div class="load-dot"></div>Assessing portfolio strength</div>
+      <div class="load-step" id="ls5"><div class="load-dot"></div>Generating readiness score</div>
+    </div>
+  </div></div>`;
+}
+
+function animateLoading(){
+  const ids=['ls2','ls3','ls4','ls5'];
+  ids.forEach((id,i)=>{
+    setTimeout(()=>{
+      if(document.getElementById(id)){
+        document.getElementById(id).className='load-step done';
+        if(ids[i+1]&&document.getElementById(ids[i+1])) document.getElementById(ids[i+1]).className='load-step active';
+      }
+    },(i+1)*800);
+  });
+}
+
+function gradeFromScore(s){
+  if(s>=85)return'A';if(s>=70)return'B';if(s>=55)return'C';if(s>=40)return'D';return'F';
+}
+function gradeLabel(g){
+  return{A:'Excellent',B:'Good',C:'Average',D:'Needs Work',F:'Not Ready'}[g]||'';
+}
+function barColor(s){
+  if(s>=70)return'var(--green)';if(s>=50)return'var(--cyan)';if(s>=35)return'var(--amber)';return'var(--red)';
+}
+
+function screenResults(){
+  const r=S.result;
+  const grade=gradeFromScore(r.overall);
+  const scores=[
+    {label:'Resume',val:r.resume,icon:'📄'},
+    {label:'Technical',val:r.technical,icon:'⚡'},
+    {label:'Portfolio',val:r.portfolio,icon:'🗂️'},
+    {label:'Communication',val:r.communication,icon:'🎙️'}
+  ];
+  const circ=2*Math.PI*68;
+  const dash=circ*(r.overall/100);
+  return `<div class="screen"><div class="results-wrap">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div class="hero-badge" style="margin-bottom:0.75rem"><div class="pulse"></div>Evaluation Complete</div>
+      <h2>Your Interview Readiness Report</h2>
+      <p class="muted" style="margin-top:4px">Generated for ${esc(r.name)} · ${esc(r.role)}</p>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="score-hero">
+        <div>
+          <div class="score-ring-wrap">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="68" fill="none" stroke="#ffffff0f" stroke-width="10"/>
+              <circle cx="80" cy="80" r="68" fill="none" stroke="url(#sg)" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="${dash} ${circ}" style="transition:stroke-dasharray 1.5s ease"/>
+              <defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs>
+            </svg>
+            <div class="score-center">
+              <div class="score-num" style="color:var(--cyan)">${r.overall}</div>
+              <div class="score-denom">/100</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="grade-badge grade-${grade}" style="margin-bottom:12px">${grade} <span style="font-size:16px;vertical-align:middle">${gradeLabel(grade)}</span></div>
+          <h3 style="margin-bottom:6px">${esc(r.headline)}</h3>
+          <p class="muted" style="font-size:13px">${esc(r.summary)}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="score-cards">
+      ${scores.map(s=>`<div class="score-card">
+        <div style="font-size:20px;margin-bottom:6px">${s.icon}</div>
+        <div class="sc-label">${s.label}</div>
+        <div class="sc-val" style="color:${barColor(s.val)}">${s.val}</div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">/100</div>
+        <div class="sc-bar"><div class="sc-bar-fill" style="width:${s.val}%;background:${barColor(s.val)}"></div></div>
+      </div>`).join('')}
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3 style="margin-bottom:1rem">✅ Strengths</h3>
+        <div class="feedback-list">
+          ${r.strengths.map(s=>`<div class="fb-item"><div class="fb-icon">💪</div><div class="fb-text">${esc(s)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:1rem">🔧 Areas to Improve</h3>
+        <div class="feedback-list">
+          ${r.weaknesses.map(w=>`<div class="fb-item"><div class="fb-icon">⚠️</div><div class="fb-text">${esc(w)}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem">
+      <h3 style="margin-bottom:8px">🛠️ Skill Heatmap</h3>
+      <p class="muted" style="font-size:12px;margin-bottom:1rem">Based on your selected skills and assessment</p>
+      <div class="heatmap">
+        ${r.heatmap.map(h=>`<div class="hm-item hm-${esc(h.level)}">${esc(h.skill)}</div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:1rem">🗺️ Personalised Improvement Roadmap</h3>
+      <div class="roadmap">
+        ${r.roadmap.map((rm,i)=>`<div class="roadmap-item">
+          <div class="rm-num">${i+1}</div>
+          <div><div class="rm-title">${esc(rm.title)}</div><div class="rm-desc">${esc(rm.desc)}</div></div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:2rem">
+      <button class="btn btn-ghost" onclick="setStep(0)" style="margin-right:10px">← New Evaluation</button>
+      <button class="btn btn-primary" onclick="window.print()">Download Report 📥</button>
+    </div>
+  </div></div>`;
+}
+
+function bindEvents(){
+  const q=(id)=>document.getElementById(id);
+
+  // Welcome
+  const apiInput=q('apikey');
+  if(apiInput){
+    apiInput.oninput=()=>{S.apiKey=apiInput.value.trim();q('btn-start').disabled=!S.apiKey;};
+    q('btn-start').onclick=()=>{if(S.apiKey)setStep(1);};
+  }
+
+  // Profile
+  if(q('f-name')){
+    const check=()=>{q('btn-p2').disabled=!(q('f-name').value.trim()&&q('f-email').value.trim());};
+    q('f-name').oninput=check;q('f-email').oninput=check;
+    q('btn-p2').onclick=()=>{
+      S.name=q('f-name').value.trim();S.email=q('f-email').value.trim();
+      S.role=q('f-role').value;S.level=q('f-level').value;setStep(2);
+    };
+  }
+
+  // Resume
+  if(q('f-resume')){
+    q('f-resume').oninput=()=>{q('btn-p3').disabled=!q('f-resume').value.trim();};
+    q('btn-p3').onclick=()=>{S.resumeText=q('f-resume').value.trim();setStep(3);};
+  }
+
+  // Skills
+  document.querySelectorAll('[data-skill]').forEach(el=>{
+    el.onclick=()=>{
+      const s=el.dataset.skill;
+      S.skills=S.skills.includes(s)?S.skills.filter(x=>x!==s):[...S.skills,s];
+      const nb=q('btn-p4');if(nb)nb.disabled=!(S.skills.length&&S.mcqPick!==null);
+      el.classList.toggle('on',S.skills.includes(s));
+    };
+  });
+  document.querySelectorAll('[data-mcq]').forEach(el=>{
+    el.onclick=()=>{S.mcqPick=parseInt(el.dataset.mcq);render();};
+  });
+  if(q('btn-p4')) q('btn-p4').onclick=()=>setStep(4);
+
+  // Portfolio
+  document.querySelectorAll('[data-projcount]').forEach(el=>{
+    el.onclick=()=>{S.projectCount=el.dataset.projcount;document.querySelectorAll('[data-projcount]').forEach(e=>e.classList.toggle('on',e===el));q('btn-p5').disabled=false;};
+  });
+  if(q('btn-p5')) q('btn-p5').onclick=()=>{
+    S.github=q('f-github').value;S.portfolio=q('f-portfolio').value;S.linkedin=q('f-linkedin').value;setStep(5);
+  };
+
+  // Communication
+  document.querySelectorAll('[data-tc]').forEach(el=>{el.onclick=()=>{S.techComfort=el.dataset.tc;document.querySelectorAll('[data-tc]').forEach(e=>e.classList.toggle('on',e===el));checkComm();};});
+  document.querySelectorAll('[data-bc]').forEach(el=>{el.onclick=()=>{S.behavComfort=el.dataset.bc;document.querySelectorAll('[data-bc]').forEach(e=>e.classList.toggle('on',e===el));checkComm();};});
+  document.querySelectorAll('[data-cc]').forEach(el=>{el.onclick=()=>{S.commClarity=el.dataset.cc;document.querySelectorAll('[data-cc]').forEach(e=>e.classList.toggle('on',e===el));checkComm();};});
+  document.querySelectorAll('[data-cn]').forEach(el=>{el.onclick=()=>{S.confidence=el.dataset.cn;document.querySelectorAll('[data-cn]').forEach(e=>e.classList.toggle('on',e===el));checkComm();};});
+
+  if(q('btn-submit')) q('btn-submit').onclick=async()=>{setStep(6);animateLoading();await callAPI();setStep(7);};
+}
+
+function checkComm(){
+  const nb=document.getElementById('btn-submit');
+  if(nb)nb.disabled=!(S.techComfort&&S.behavComfort&&S.commClarity&&S.confidence);
+}
+
+async function callAPI(){
+
+  const prompt = `You are an expert interview readiness evaluator for tech students.
+
+Analyze the following student profile and return ONLY valid JSON.
+
+Student Profile:
+- Name: ${S.name}
+- Target Role: ${S.role}
+- Experience Level: ${S.level}
+- Resume Content: ${S.resumeText || 'Not provided'}
+- Technical Skills: ${S.skills.join(', ') || 'None listed'}
+- MCQ Answer: ${S.mcqPick === 1 ? 'Correct' : 'Incorrect'}
+- GitHub: ${S.github || 'Not provided'}
+- Portfolio: ${S.portfolio || 'Not provided'}
+- LinkedIn: ${S.linkedin || 'Not provided'}
+- Number of Projects: ${S.projectCount}
+- Technical Interview Confidence: ${S.techComfort}
+- Behavioural Interview Confidence: ${S.behavComfort}
+- Communication Clarity: ${S.commClarity}
+- Handles Pressure: ${S.confidence}
+
+Return this exact JSON structure:
+{
+  "overall": 0,
+  "resume": 0,
+  "technical": 0,
+  "portfolio": 0,
+  "communication": 0,
+  "name": "${S.name}",
+  "role": "${S.role}",
+  "headline": "",
+  "summary": "",
+  "strengths": ["","",""],
+  "weaknesses": ["","",""],
+  "heatmap": [
+    {"skill":"","level":"high"}
+  ],
+  "roadmap": [
+    {"title":"","desc":""}
+  ]
+}`;
+
+  try {
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 25000);
+
+    const response = await fetch(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': S.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1800,
+          temperature: 0.4,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+      }
+    );
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+
+    if (!data.content || !data.content.length) {
+      throw new Error('Empty AI response');
+    }
+
+    const text = data.content
+      .map(item => item.text || '')
+      .join('');
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error('Invalid AI JSON');
+    }
+
+    S.result = JSON.parse(jsonMatch[0]);
+
+  } catch (e) {
+
+    console.error(e);
+
+    showToast(
+      'AI service unavailable — showing demo evaluation'
+    );
+
+    S.result = {
+      overall: 58,
+      resume: 62,
+      technical: 55,
+      portfolio: 48,
+      communication: 65,
+
+      name: S.name,
+      role: S.role,
+
+      headline: 'Strong foundation, focused growth needed',
+
+      summary:
+        `${S.name} shows solid foundational skills for a ${S.role} role. With targeted improvements in portfolio strength and technical depth, interview readiness can significantly improve in 4-6 weeks.`,
+
+      strengths: [
+        'Good technical skill breadth',
+        'Shows initiative with projects',
+        'Communication confidence is above average'
+      ],
+
+      weaknesses: [
+        'Portfolio lacks depth',
+        'Resume lacks measurable achievements',
+        'Technical interview confidence needs improvement'
+      ],
+
+      heatmap: [
+        { skill: 'Python', level: 'high' },
+        { skill: 'Git', level: 'high' },
+        { skill: 'DSA', level: 'low' },
+        { skill: 'System Design', level: 'low' },
+        { skill: 'Communication', level: 'mid' }
+      ],
+
+      roadmap: [
+        {
+          title: 'Build stronger projects',
+          desc: 'Focus on deployable real-world projects with proper documentation.'
+        },
+        {
+          title: 'Practice DSA',
+          desc: 'Solve LeetCode medium-level problems consistently.'
+        },
+        {
+          title: 'Improve resume',
+          desc: 'Add quantified achievements and better formatting.'
+        },
+        {
+          title: 'Mock interviews',
+          desc: 'Practice technical and HR rounds weekly.'
+        },
+        {
+          title: 'Improve online presence',
+          desc: 'Optimize GitHub and LinkedIn profiles.'
+        }
+      ]
+    };
+  }
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function showToast(msg){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),4000);
+}
+
+function saveState(){
+  const clone={...S};
+  delete clone.apiKey;
+  delete clone.result;
+  localStorage.setItem('careerforge-state',JSON.stringify(clone));
+}
+
+render();
+</script>
+</body>
+</html>
